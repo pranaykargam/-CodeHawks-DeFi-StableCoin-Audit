@@ -26,6 +26,8 @@ pragma solidity ^0.8.18;
 import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
+// NatSpec Documentation
+
 /*
  * @title DecentralizedStableCoin
  * @author Patrick Collins
@@ -43,6 +45,13 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
 
     constructor() ERC20("DecentralizedStableCoin", "DSC") {}
 
+
+// Engine.sol manages collateral/protocols but cannot directly burn tokens. Token logic belongs in the token contract per ERC20 standard.
+
+// Amount is what you tell the contract to burn (input).
+// Balance is what you actually own right now.
+
+// audited (no bug✅)
     function burn(uint256 _amount) public override onlyOwner {
         uint256 balance = balanceOf(msg.sender);
         if (_amount <= 0) {
@@ -53,6 +62,8 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         }
         super.burn(_amount);
     }
+
+    // audited (no bug✅)
 
     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
         if (_to == address(0)) {

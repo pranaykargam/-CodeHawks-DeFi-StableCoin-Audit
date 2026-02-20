@@ -43,5 +43,7 @@ contract DSCEngineTest is StdCheats, Test {
 
         vm.expectRevert(OracleLib.OracleLib__StalePrice.selector);
         AggregatorV3Interface(address(aggregator)).staleCheckLatestRoundData();
+
+   
     }
 }

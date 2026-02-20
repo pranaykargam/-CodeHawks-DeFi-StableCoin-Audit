@@ -20,8 +20,6 @@ error OracleLib__StaleRound();
 error OracleLib__InvalidPrice();
 
     uint256 private constant TIMEOUT = 3 hours; // 3 * 60 * 60 = 10800 seconds
-   
-
 
 // Chainlink latestRoundData() returns:
 
@@ -30,8 +28,6 @@ error OracleLib__InvalidPrice();
 // startedAt: Block when round began
 // updatedAt: Block when price was set (CRITICAL for staleness)
 // answeredInRound: Round where this answer was computed
-
-
     function staleCheckLatestRoundData(AggregatorV3Interface priceFeed)
         public
         view
@@ -50,10 +46,6 @@ error OracleLib__InvalidPrice();
 
         return (roundId, answer, startedAt, updatedAt, answeredInRound);
     }
-
-  
-
-
     function getTimeout(AggregatorV3Interface /* chainlinkFeed */ ) public pure returns (uint256) {
         return TIMEOUT;
     }
