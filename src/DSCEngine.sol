@@ -29,6 +29,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {OracleLib} from "./libraries/OracleLib.sol";
 
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+
 /**
  * @title DSCEngine
  * @author Patrick Collins
@@ -347,6 +350,12 @@ contract DSCEngine is ReentrancyGuard {
         return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
+
+  ////////////////////////////////////////////////////////////////////////////
+    // BUGGG ✅ 
+    ////////////////////////////////////////////////////////////////////////////
+
+// this gives the current market value (in USD) of a user's locked assets backing their borrowed stablecoins.
     function getAccountCollateralValue(address user) public view returns (uint256 totalCollateralValueInUsd) {
         // loop through each collateral token, get the amount they have deposited, and map it to
         // the price, to get the USD value
@@ -358,13 +367,40 @@ contract DSCEngine is ReentrancyGuard {
         return totalCollateralValueInUsd;
     }
 
-    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
-        // 1 ETH = $1000
-        // The returned value from CL will be 1000 * 1e8
-        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
+ function getUsdValue(address token, uint256 amount) public view returns (uint256) {
+    AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+    (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
+    require(price > 0, "Price <= 0");
+
+    uint8 tokenDecimals = IERC20Metadata(token).decimals();
+    uint8 priceDecimals = priceFeed.decimals(); // don't assume 8
+
+    // 1) normalize amount to 1e18
+    uint256 amount1e18;
+    if (tokenDecimals < 18) {
+        amount1e18 = amount * (10 ** (18 - tokenDecimals));
+    } else if (tokenDecimals > 18) {
+        amount1e18 = amount / (10 ** (tokenDecimals - 18));
+    } else {
+        amount1e18 = amount;
     }
+
+    // 2) normalize price to 1e18
+    uint256 price1e18;
+    if (priceDecimals < 18) {
+        price1e18 = uint256(price) * (10 ** (18 - priceDecimals));
+    } else if (priceDecimals > 18) {
+        price1e18 = uint256(price) / (10 ** (priceDecimals - 18));
+    } else {
+        price1e18 = uint256(price);
+    }
+
+    // 3) result: 18‑decimal USD
+    return (amount1e18 * price1e18) / 1e18;
+}
+
+
+
 
     function getAccountInformation(address user)
         external

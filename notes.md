@@ -113,3 +113,90 @@ NEW CODE (your fix): answeredInRound(1) < roundId(2) → REVERT StaleRound ✅
                     └─ WITH FIX ──────> Transaction REVERTS → $0 loss 🛡️
 
 
+
+
+02.  src/DSCEngine
+
+ Incorrect total collateral calculation due to unnormalized decimals in getAccountCollateralValue.
+ The main bug is that this getUsdValue returns a value with the token’s decimals,
+  not a fixed 18‑decimal USD amount, and then getAccountCollateralValue blindly sums those mismatched values
+
+ ❌  ❌  ❌  ❌370 line
+  `function getUsdValue // main `
+  `function getAccountCollateralValue // follows`
+
+ ✅✅✅ 
+
+ updated the getUsdValue 
+ by writing ifelse conditions.
+
+
+
+
+1. Goal of DSCEngine
+   - Need to compare:
+       a) User collateral value in USD
+       b) User debt in DSC (18 decimals)
+   - So protocol expects: "all USD values are in 18-decimal format"
+
+-------------------------------------------------
+2. Old behavior (BUG)
+-------------------------------------------------
+getAccountCollateralValue(user)
+    |
+    v
+Loop over each collateral token:
+    - Read amount user deposited for that token
+    - Call getUsdValue(token, amount)
+        |
+        v
+        getUsdValue (OLD)
+            - Read Chainlink price (e.g. 1000 * 1e8)
+            - Multiply: price * ADDITIONAL_FEED_PRECISION * amount / PRECISION
+            - This math:
+                • Normalizes price to 18 decimals
+                • BUT final result keeps the token's decimals
+                  (6-dec for USDC, 8-dec for WBTC, 18-dec for WETH, etc.)
+        |
+        v
+    - Add that value into totalCollateralValueInUsd
+
+Problem:
+    - totalCollateralValueInUsd = sum of values with mixed decimals
+        • Part of it 18-dec, part 6-dec, part 8-dec, ...
+    - Health factor / collateralization checks compare this broken sum
+      against 18-dec DSC debt
+    - Result: wrong collateral value → under/overestimation → possible exploits
+
+-------------------------------------------------
+3. New behavior (FIXED)
+-------------------------------------------------
+getAccountCollateralValue(user)
+    |
+    v
+Loop over each collateral token:
+    - Read amount user deposited for that token
+    - Call getUsdValue(token, amount)
+        |
+        v
+        getUsdValue (FIXED)
+            - Read Chainlink price
+            - Read tokenDecimals (from IERC20Metadata)
+            - Read priceDecimals (from priceFeed.decimals())
+            - Normalize:
+                • amount  -> amount1e18  (always 18 decimals)
+                • price   -> price1e18   (always 18 decimals)
+            - Compute:
+                usdValue = (amount1e18 * price1e18) / 1e18
+            - usdValue is now ALWAYS 18-decimal USD
+        |
+        v
+    - Add usdValue into totalCollateralValueInUsd
+
+Now:
+    - totalCollateralValueInUsd is a sum of 18-decimal USD values only
+    - It is directly comparable with 18-decimal DSC debt
+    - Health factor, mint limits, and liquidation logic use consistent units
+    - Decimal mismatch bug is removed
+
+
