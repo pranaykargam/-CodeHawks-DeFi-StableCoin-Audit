@@ -61,6 +61,9 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MintFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFactorNotImproved();
+    error DSCEngine__NoTokensProvided();
+    error  DSCEngine__InvalidDscAddress();
+   error  DSCEngine__ZeroAddressNotAllowed();
 
     //////////////////
     // Type       //
@@ -77,9 +80,12 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant LIQUIDATION_BONUS = 10; // this means a 10% bonus
 
+    // stores the protocol state
+
     mapping(address token => address priceFeed) private s_priceFeeds; // tokenToPriceFeed
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
     mapping(address user => uint256 amountDscMinted) private s_DSCMinted;
+
     address[] private s_collateralTokens;
 
     DecentralizedStableCoin private immutable i_dsc;
@@ -87,6 +93,11 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////
     // Events          //
     /////////////////////
+
+   // They enable real-time monitoring by dApps, wallets, or services like The Graph for querying history (e.g., CollateralDeposited logs user deposits for UI updates).
+// Cheaper than storage: Logs are in transaction receipts, not contract state, saving gas.
+// indexed wisely (up to 3 per event).
+
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(
         address indexed redeemedFrom, address indexed redeemedTo, address indexed token, uint256 amount
@@ -109,21 +120,48 @@ contract DSCEngine is ReentrancyGuard {
         _;
     }
 
+
     //////////////////
     // Functions    //
     //////////////////
+
+    // before code❌
+    // constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
+    //     // USD Price Feeds
+    //     if (tokenAddresses.length != priceFeedAddresses.length) {
+    //         revert DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+    //     }
+    //     // For example ETH / USD, BTC / USD, MKR / USD, etc
+    //     for (uint256 i = 0; i < tokenAddresses.length; i++) {
+    //         s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+    //         s_collateralTokens.push(tokenAddresses[i]);
+    //     }
+    //     i_dsc = DecentralizedStableCoin(dscAddress);
+    // }
+
+// bug ✅
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
-        // USD Price Feeds
-        if (tokenAddresses.length != priceFeedAddresses.length) {
-            revert DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
-        }
-        // For example ETH / USD, BTC / USD, MKR / USD, etc
-        for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
-            s_collateralTokens.push(tokenAddresses[i]);
-        }
-        i_dsc = DecentralizedStableCoin(dscAddress);
+    if (tokenAddresses.length == 0) {
+        revert DSCEngine__NoTokensProvided();
     }
+    if (tokenAddresses.length != priceFeedAddresses.length) {
+        revert DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
+    }
+    if (dscAddress == address(0)) {
+        revert DSCEngine__InvalidDscAddress();
+    }
+
+    for (uint256 i = 0; i < tokenAddresses.length; i++) {
+        if (tokenAddresses[i] == address(0) || priceFeedAddresses[i] == address(0)) {
+            revert DSCEngine__ZeroAddressNotAllowed();
+        }
+        s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+        s_collateralTokens.push(tokenAddresses[i]);
+    }
+
+    i_dsc = DecentralizedStableCoin(dscAddress);
+}
+
 
     ///////////////////////////
     // External Functions    //
@@ -137,7 +175,7 @@ contract DSCEngine is ReentrancyGuard {
      */
     function depositCollateralAndMintDsc(
         address tokenCollateralAddress,
-        uint256 amountCollateral,
+        uint256 amountCollateral, 
         uint256 amountDscToMint
     ) external {
         depositCollateral(tokenCollateralAddress, amountCollateral);
@@ -155,12 +193,35 @@ contract DSCEngine is ReentrancyGuard {
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
     {
-        s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
-        emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+
+//         Old version (your code):
+
+// Effects: update s_collateralDeposited[msg.sender][token] += amount.
+
+// Interaction: call IERC20(token).transferFrom(...).
+
+// Revert if success == false.
+
+
+
+// Emit event.
+        // s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+        // emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+        // bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+        // if (!success) {
+        //     revert DSCEngine__TransferFailed();
+        // }
+
+        // Reordered version:
+
+// Interaction: transferFrom first.
+
+// Effects: update storage only if transfer succe
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
-        if (!success) {
-            revert DSCEngine__TransferFailed();
-        }
+if (!success) revert DSCEngine__TransferFailed();
+s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+
     }
 
     /*
