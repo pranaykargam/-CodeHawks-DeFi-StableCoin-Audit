@@ -139,7 +139,7 @@ contract DSCEngine is ReentrancyGuard {
     //     i_dsc = DecentralizedStableCoin(dscAddress);
     // }
 
-// bug ✅
+// @audit 
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
     if (tokenAddresses.length == 0) {
         revert DSCEngine__NoTokensProvided();
@@ -234,27 +234,27 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
      * @param amountDscToMint The amount of decentralized stablecoin to mint
      * @notice they must have more collateral value than the minimum threshold
      */
-    // function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
-    //     s_DSCMinted[msg.sender] += amountDscToMint;
-    //     // if they minted too much ($150 DSC, $100 ETH)
-    //     _revertIfHealthFactorIsBroken(msg.sender);
-    //     bool minted = i_dsc.mint(msg.sender, amountDscToMint);
-    //     if (!minted) {
-    //         revert DSCEngine__MintFailed();
-    //     }
-    // }
-
     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
-    // CHECKS: Health factor before any state changes
-    _revertIfHealthFactorIsBroken(msg.sender);
+        s_DSCMinted[msg.sender] += amountDscToMint;
+        // if they minted too much ($150 DSC, $100 ETH)
+        _revertIfHealthFactorIsBroken(msg.sender);
+        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+        if (!minted) {
+            revert DSCEngine__MintFailed();
+        }
+    }
+
+//     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
+//     // CHECKS: Health factor before any state changes
+//     _revertIfHealthFactorIsBroken(msg.sender);
     
-    // EFFECTS: Update internal tracking
-    s_DSCMinted[msg.sender] += amountDscToMint;
+//     // EFFECTS: Update internal tracking
+//     s_DSCMinted[msg.sender] += amountDscToMint;
     
-    // INTERACTIONS: External call last
-    bool minted = i_dsc.mint(msg.sender, amountDscToMint);
-    if (!minted) revert DSCEngine__MintFailed();
-}
+//     // INTERACTIONS: External call last
+//     bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+//     if (!minted) revert DSCEngine__MintFailed();
+// }
 
 
     /*
@@ -270,7 +270,6 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
     // }
 // fixed ✅
 
-// by removing the unnessary HF for burn
         function burnDsc(uint256 amount) public moreThanZero(amount) {
         _burnDsc(amount, msg.sender, msg.sender);
        
@@ -327,10 +326,7 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
     // Private & Internal Functions    //
     /////////////////////////////////////
 
-    /*
-     * @dev Low-level internal function, do not call unless the function calling it is 
-     * checking for health factors being broken
-     */
+
     function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
         s_DSCMinted[onBehalfOf] -= amountDscToBurn;
         bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
@@ -351,6 +347,8 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
             revert DSCEngine__TransferFailed();
         }
     }
+
+    
 
     /////////////////////////////////////
     // Private & Internal View/Pure Functions    //

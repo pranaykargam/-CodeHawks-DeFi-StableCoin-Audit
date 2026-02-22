@@ -247,3 +247,16 @@ Why safe from theft:
          "mint/redeem affect other users/risk → need HF"
           "Unnecessary check removed"
 
+
+06. `function _reedemCollateral`
+
+// CHECKS
+    if (amountCollateral == 0) {
+        revert DSCEngine__NeedsMoreThanZero();
+    }
+
+uint256 deposited = s_collateralDeposited[from][tokenCollateralAddress];
+    if (amountCollateral > deposited) {
+        revert DSCEngine__InsufficientCollateral();
+    }
+
