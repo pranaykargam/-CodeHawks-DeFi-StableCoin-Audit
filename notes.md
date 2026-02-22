@@ -260,3 +260,8 @@ uint256 deposited = s_collateralDeposited[from][tokenCollateralAddress];
         revert DSCEngine__InsufficientCollateral();
     }
 
+
+
+07. `function getTokenAmountFromUsd`
+equire(price > 0, "Invalid price");
+
