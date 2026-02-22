@@ -205,3 +205,45 @@ Now:
     03. Adding Zero Checks for the construcor function✅
 
 
+    src/DSCEngine.sol
+
+    04. 
+
+
+function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
+         // CHECKS: Health factor before any state changes
+    _revertIfHealthFactorIsBroken(msg.sender);
+    
+// EFFECTS: Update internal tracking
+    s_DSCMinted[msg.sender] += amountDscToMint;
+    
+// INTERACTIONS: External call last
+    bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+    if (!minted) revert DSCEngine__MintFailed();
+}
+
+`explanation`:
+    
+    No Direct Attacker Loot Here
+✅ "protocol issue, not malicious internal code"
+✅ "attacker won't loot directly"
+Why safe from theft:
+- nonReentrant → no reentrancy steal
+- moreThanZero → no DoS spam  
+- Failed mint → just reverts (no tokens stolen)
+
+
+    //////////////////
+05.✅   // burnfunction /HF(not required)  //
+    //////////////////
+          `function burn`
+
+        `unnessery of HF check`
+
+        Gas Savings
+        Much cleaner - no redundant safety
+
+    "burning = protocol debt ↓ = HF ↑ always → no check needed"
+         "mint/redeem affect other users/risk → need HF"
+          "Unnecessary check removed"
+

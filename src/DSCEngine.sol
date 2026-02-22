@@ -193,30 +193,6 @@ contract DSCEngine is ReentrancyGuard {
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
     {
-
-//         Old version (your code):
-
-// Effects: update s_collateralDeposited[msg.sender][token] += amount.
-
-// Interaction: call IERC20(token).transferFrom(...).
-
-// Revert if success == false.
-
-
-
-// Emit event.
-        // s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
-        // emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
-        // bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
-        // if (!success) {
-        //     revert DSCEngine__TransferFailed();
-        // }
-
-        // Reordered version:
-
-// Interaction: transferFrom first.
-
-// Effects: update storage only if transfer succe
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
 if (!success) revert DSCEngine__TransferFailed();
 s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
@@ -258,24 +234,46 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
      * @param amountDscToMint The amount of decentralized stablecoin to mint
      * @notice they must have more collateral value than the minimum threshold
      */
+    // function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
+    //     s_DSCMinted[msg.sender] += amountDscToMint;
+    //     // if they minted too much ($150 DSC, $100 ETH)
+    //     _revertIfHealthFactorIsBroken(msg.sender);
+    //     bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+    //     if (!minted) {
+    //         revert DSCEngine__MintFailed();
+    //     }
+    // }
+
     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
-        s_DSCMinted[msg.sender] += amountDscToMint;
-        // if they minted too much ($150 DSC, $100 ETH)
-        _revertIfHealthFactorIsBroken(msg.sender);
-        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
-        if (!minted) {
-            revert DSCEngine__MintFailed();
-        }
-    }
+    // CHECKS: Health factor before any state changes
+    _revertIfHealthFactorIsBroken(msg.sender);
+    
+    // EFFECTS: Update internal tracking
+    s_DSCMinted[msg.sender] += amountDscToMint;
+    
+    // INTERACTIONS: External call last
+    bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+    if (!minted) revert DSCEngine__MintFailed();
+}
+
 
     /*
      * @notice careful! You'll burn your DSC here! Make sure you want to do this...
      * @dev you might want to use this if you're nervous you might get liquidated and want to just burn
      * you DSC but keep your collateral in.
      */
-    function burnDsc(uint256 amount) public moreThanZero(amount) {
+
+    // bug❌
+    // function burnDsc(uint256 amount) public moreThanZero(amount) {
+    //     _burnDsc(amount, msg.sender, msg.sender);
+    //     _revertIfHealthFactorIsBroken(msg.sender); 
+    // }
+// fixed ✅
+
+// by removing the unnessary HF for burn
+        function burnDsc(uint256 amount) public moreThanZero(amount) {
         _burnDsc(amount, msg.sender, msg.sender);
-        _revertIfHealthFactorIsBroken(msg.sender); // I don't think this would ever hit...
+       
     }
 
     /*
