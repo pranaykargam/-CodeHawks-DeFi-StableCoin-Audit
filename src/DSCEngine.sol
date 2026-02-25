@@ -73,12 +73,12 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////////
     // State Variables //
     /////////////////////
-    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
-    uint256 private constant PRECISION = 1e18;
-    uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
-    uint256 private constant LIQUIDATION_PRECISION = 100;
-    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
-    uint256 private constant LIQUIDATION_BONUS = 10; // this means a 10% bonus
+    uint256 private constant _ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant _PRECISION = 1e18;
+    uint256 private constant _LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
+    uint256 private constant _LIQUIDATION_PRECISION = 100;
+    uint256 private constant _MIN_HEALTH_FACTOR = 1e18;
+    uint256 private constant _LIQUIDATION_BONUS = 10; // this means a 10% bonus
 
     // stores the protocol state
 
@@ -191,7 +191,7 @@ contract DSCEngine is ReentrancyGuard {
         public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
-        nonReentrant
+        
     {
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
 if (!success) revert DSCEngine__TransferFailed();
@@ -294,7 +294,7 @@ emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
     {
         // need to check health factor of the user
         uint256 startingUserHealthFactor = _healthFactor(user);
-        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+        if (startingUserHealthFactor >= _MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorOk();
         }
         // We want to burn their DSC "debt"
